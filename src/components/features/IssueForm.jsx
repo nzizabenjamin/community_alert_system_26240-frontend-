@@ -28,13 +28,23 @@ export const IssueForm = ({ onSubmit, onCancel, initialData = null, loading = fa
         reportedById: initialData.reportedBy?.id || user?.id || '',
         photoUrl: initialData.photoUrl || ''
       });
+    } else {
+      // Ensure reportedById is set
+      setFormData(prev => ({
+        ...prev,
+        reportedById: user?.id || ''
+      }));
     }
   }, [initialData, user]);
 
   const loadLocations = async () => {
     try {
       const response = await locationService.getAll();
-      setLocations(response.data || []);
+      console.log('Locations response:', response.data); // Debug
+      
+      // Handle array or object response
+      const locationData = Array.isArray(response.data) ? response.data : [];
+      setLocations(locationData);
     } catch (error) {
       console.error('Error loading locations:', error);
       // Fallback demo locations
@@ -62,7 +72,7 @@ export const IssueForm = ({ onSubmit, onCancel, initialData = null, loading = fa
     { value: '', label: 'Select a location' },
     ...locations.map(loc => ({
       value: loc.id,
-      label: `${loc.name} (${loc.type})`
+      label: `${loc.name} (${loc.type || 'Location'})`
     }))
   ];
 
@@ -97,13 +107,23 @@ export const IssueForm = ({ onSubmit, onCancel, initialData = null, loading = fa
     e.preventDefault();
     
     if (validate()) {
-      onSubmit(formData);
+      // Prepare data for backend
+      const submitData = {
+        title: formData.title.trim(),
+        description: formData.description.trim(),
+        category: formData.category,
+        locationId: formData.locationId,
+        reportedById: formData.reportedById || user?.id,
+        photoUrl: formData.photoUrl.trim() || null
+      };
+      
+      console.log('Submitting issue:', submitData); // Debug
+      onSubmit(submitData);
     }
   };
 
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    // Clear error for this field when user starts typing
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }

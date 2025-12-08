@@ -33,87 +33,83 @@ export const Issues = () => {
   }, [currentPage, statusFilter]);
 
   const loadIssues = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const response = await issueService.getAll(currentPage, pageSize, 'dateReported', 'DESC');
-      
-      if (response.data) {
-        // If response.data is an array, use it directly
-        if (Array.isArray(response.data)) {
-          setIssues(response.data);
-          setTotalPages(Math.ceil(response.data.length / pageSize));
-        } else {
-          // If paginated response
-          setIssues(response.data.content || []);
-          setTotalPages(response.data.totalPages || 1);
-        }
-      }
-    } catch (err) {
-      console.error('Error loading issues:', err);
-      setError('Failed to load issues. Using demo data.');
-      
-      // Demo data
-      setIssues([
-        { 
-          id: '1', 
-          title: 'Road Damage on Main Street', 
-          status: 'REPORTED', 
-          category: 'Infrastructure',
-          dateReported: new Date().toISOString(),
-          location: { name: 'Kigali' },
-          reportedBy: { fullName: 'John Doe' }
-        },
-        { 
-          id: '2', 
-          title: 'Water Supply Issue in Sector 3', 
-          status: 'IN_PROGRESS', 
-          category: 'Utilities',
-          dateReported: new Date(Date.now() - 86400000).toISOString(),
-          location: { name: 'Nyanza' },
-          reportedBy: { fullName: 'Jane Smith' }
-        },
-        { 
-          id: '3', 
-          title: 'Broken Street Light on Avenue 12', 
-          status: 'RESOLVED', 
-          category: 'Infrastructure',
-          dateReported: new Date(Date.now() - 172800000).toISOString(),
-          location: { name: 'Musanze' },
-          reportedBy: { fullName: 'Bob Johnson' }
-        },
-        { 
-          id: '4', 
-          title: 'Pothole near City Center', 
-          status: 'REPORTED', 
-          category: 'Infrastructure',
-          dateReported: new Date(Date.now() - 259200000).toISOString(),
-          location: { name: 'Kigali' },
-          reportedBy: { fullName: 'Alice Brown' }
-        },
-        { 
-          id: '5', 
-          title: 'Garbage Collection Missed', 
-          status: 'IN_PROGRESS', 
-          category: 'Sanitation',
-          dateReported: new Date(Date.now() - 345600000).toISOString(),
-          location: { name: 'Rubavu' },
-          reportedBy: { fullName: 'Charlie Davis' }
-        }
-      ]);
-      setTotalPages(1);
-    } finally {
-      setLoading(false);
+  try {
+    setLoading(true);
+    setError(null);
+    
+    const response = await issueService.getAll(currentPage, pageSize, 'dateReported', 'DESC');
+    
+    // EXTENSIVE DEBUG LOGGING
+    console.log('=== ISSUES DEBUG ===');
+    console.log('Full response:', response);
+    console.log('Response data:', response.data);
+    console.log('Is array?', Array.isArray(response.data));
+    console.log('Has content?', response.data?.content);
+    console.log('==================');
+    
+    // Handle different response formats
+    let issuesData = [];
+    let pages = 1;
+    
+    if (Array.isArray(response.data)) {
+      // If response.data is directly an array
+      console.log('Format: Direct Array');
+      issuesData = response.data;
+      pages = Math.ceil(response.data.length / pageSize) || 1;
+    } else if (response.data?.content && Array.isArray(response.data.content)) {
+      // If paginated response with content array
+      console.log('Format: Paginated with content');
+      issuesData = response.data.content;
+      pages = response.data.totalPages || 1;
+    } else if (typeof response.data === 'object' && response.data !== null) {
+      // If it's an object but not the expected format
+      console.log('Format: Object (unexpected)');
+      console.log('Object keys:', Object.keys(response.data));
+      issuesData = [];
+      pages = 1;
+    } else {
+      // Empty or null
+      console.log('Format: Empty or null');
+      issuesData = [];
+      pages = 1;
     }
-  };
+    
+    console.log('Final issuesData:', issuesData);
+    console.log('Final pages:', pages);
+    
+    setIssues(issuesData);
+    setTotalPages(pages);
+    
+    if (issuesData.length === 0) {
+      console.warn('No issues loaded - check if database has data');
+    }
+    
+  } catch (err) {
+    console.error('=== ERROR LOADING ISSUES ===');
+    console.error('Error object:', err);
+    console.error('Error response:', err.response);
+    console.error('Error data:', err.response?.data);
+    console.error('Error status:', err.response?.status);
+    console.error('==========================');
+    
+    setError(`Failed to load issues: ${err.response?.data?.message || err.message}`);
+    setIssues([]);
+    setTotalPages(1);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleCreateIssue = async (issueData) => {
   try {
     setLoading(true);
     setError(null);
     
-    await issueService.create(issueData);
+    console.log('Creating issue with data:', issueData); // Debug
+    
+    const response = await issueService.create(issueData);
+    console.log('Create response:', response.data); // Debug
+    
     setSuccess('Issue reported successfully!');
     setShowCreateModal(false);
     loadIssues(); // Reload the list
@@ -121,7 +117,14 @@ export const Issues = () => {
     setTimeout(() => setSuccess(null), 3000);
   } catch (err) {
     console.error('Error creating issue:', err);
-    setError('Failed to create issue. Please try again.');
+    console.error('Error response:', err.response?.data); // Debug
+    
+    const errorMessage = err.response?.data?.message || 
+                        err.response?.data?.error ||
+                        err.message ||
+                        'Failed to create issue';
+    
+    setError(errorMessage);
   } finally {
     setLoading(false);
   }
