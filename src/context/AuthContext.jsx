@@ -9,6 +9,7 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Check if user is already logged in
     const currentUser = authService.getCurrentUser();
     if (currentUser) {
       setUser(currentUser);
@@ -24,6 +25,7 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(true);
       return response.data;
     } catch (error) {
+      console.error('Login error:', error);
       throw error;
     }
   };
