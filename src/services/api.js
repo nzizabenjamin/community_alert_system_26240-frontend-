@@ -5,7 +5,21 @@ const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
+    'Accept': 'application/json', // ← Add this
   },
+  // Force JSON response type
+  responseType: 'json', // ← Add this
+  transformResponse: [function (data) {
+    // Axios should auto-parse, but force it if needed
+    if (typeof data === 'string') {
+      try {
+        return JSON.parse(data);
+      } catch (e) {
+        return data;
+      }
+    }
+    return data;
+  }]
 });
 
 // Request interceptor to add token

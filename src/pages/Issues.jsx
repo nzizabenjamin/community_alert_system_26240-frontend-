@@ -21,6 +21,7 @@ export const Issues = () => {
   const [issues, setIssues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [pageSize] = useState(10);
@@ -33,104 +34,103 @@ export const Issues = () => {
   }, [currentPage, statusFilter]);
 
   const loadIssues = async () => {
-  try {
-    setLoading(true);
-    setError(null);
-    
-    const response = await issueService.getAll(currentPage, pageSize, 'dateReported', 'DESC');
-    
-    // EXTENSIVE DEBUG LOGGING
-    console.log('=== ISSUES DEBUG ===');
-    console.log('Full response:', response);
-    console.log('Response data:', response.data);
-    console.log('Is array?', Array.isArray(response.data));
-    console.log('Has content?', response.data?.content);
-    console.log('==================');
-    
-    // Handle different response formats
-    let issuesData = [];
-    let pages = 1;
-    
-    if (Array.isArray(response.data)) {
-      // If response.data is directly an array
-      console.log('Format: Direct Array');
-      issuesData = response.data;
-      pages = Math.ceil(response.data.length / pageSize) || 1;
-    } else if (response.data?.content && Array.isArray(response.data.content)) {
-      // If paginated response with content array
-      console.log('Format: Paginated with content');
-      issuesData = response.data.content;
-      pages = response.data.totalPages || 1;
-    } else if (typeof response.data === 'object' && response.data !== null) {
-      // If it's an object but not the expected format
-      console.log('Format: Object (unexpected)');
-      console.log('Object keys:', Object.keys(response.data));
-      issuesData = [];
-      pages = 1;
-    } else {
-      // Empty or null
-      console.log('Format: Empty or null');
-      issuesData = [];
-      pages = 1;
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await issueService.getAll(currentPage, pageSize, 'dateReported', 'DESC');
+      
+      console.log('📥 Response type:', typeof response.data);
+      
+      // Force parse if string
+      let data = response.data;
+      if (typeof data === 'string') {
+        console.log('⚠️ Parsing string response...');
+        try {
+          data = JSON.parse(data);
+          console.log('✅ Parsed successfully, type:', typeof data);
+        } catch (e) {
+          console.error('❌ Parse error:', e);
+          throw new Error('Invalid JSON from server');
+        }
+      }
+      
+      console.log('📥 Data after parsing:', Array.isArray(data) ? 'Array' : typeof data);
+      
+      // Handle response
+      let issuesData = [];
+      let pages = 1;
+      
+      if (Array.isArray(data)) {
+        // Direct array response
+        issuesData = data;
+        pages = 1;
+        console.log('✅ Loaded', issuesData.length, 'issues');
+      } else if (data.content && Array.isArray(data.content)) {
+        // Paginated response
+        issuesData = data.content;
+        pages = data.totalPages || 1;
+        console.log('✅ Loaded', issuesData.length, 'issues, pages:', pages);
+      } else {
+        console.error('❌ Unexpected format');
+        console.error('Data:', data);
+        setError('Unexpected response format from server');
+      }
+      
+      setIssues(issuesData);
+      setTotalPages(pages);
+      
+      if (issuesData.length > 0) {
+        console.log('🎉 First issue:', issuesData[0]);
+      } else {
+        console.log('ℹ️ No issues');
+      }
+      
+    } catch (err) {
+      console.error('❌ Load error:', err);
+      console.error('Response:', err.response?.data);
+      
+      const errorMessage = err.response?.data?.message || 
+                          err.message ||
+                          'Failed to load issues';
+      
+      setError(errorMessage);
+      setIssues([]);
+      setTotalPages(1);
+    } finally {
+      setLoading(false);
     }
-    
-    console.log('Final issuesData:', issuesData);
-    console.log('Final pages:', pages);
-    
-    setIssues(issuesData);
-    setTotalPages(pages);
-    
-    if (issuesData.length === 0) {
-      console.warn('No issues loaded - check if database has data');
-    }
-    
-  } catch (err) {
-    console.error('=== ERROR LOADING ISSUES ===');
-    console.error('Error object:', err);
-    console.error('Error response:', err.response);
-    console.error('Error data:', err.response?.data);
-    console.error('Error status:', err.response?.status);
-    console.error('==========================');
-    
-    setError(`Failed to load issues: ${err.response?.data?.message || err.message}`);
-    setIssues([]);
-    setTotalPages(1);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const handleCreateIssue = async (issueData) => {
-  try {
-    setLoading(true);
-    setError(null);
-    
-    console.log('Creating issue with data:', issueData); // Debug
-    
-    const response = await issueService.create(issueData);
-    console.log('Create response:', response.data); // Debug
-    
-    setSuccess('Issue reported successfully!');
-    setShowCreateModal(false);
-    loadIssues(); // Reload the list
-    
-    setTimeout(() => setSuccess(null), 3000);
-  } catch (err) {
-    console.error('Error creating issue:', err);
-    console.error('Error response:', err.response?.data); // Debug
-    
-    const errorMessage = err.response?.data?.message || 
-                        err.response?.data?.error ||
-                        err.message ||
-                        'Failed to create issue';
-    
-    setError(errorMessage);
-  } finally {
-    setLoading(false);
-  }
-};
-
-const [success, setSuccess] = useState(null);
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('📤 Creating issue:', issueData);
+      
+      const response = await issueService.create(issueData);
+      console.log('✅ Issue created:', response.data);
+      
+      setSuccess('Issue reported successfully!');
+      setShowCreateModal(false);
+      loadIssues(); // Reload the list
+      
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err) {
+      console.error('❌ Create error:', err);
+      console.error('Response:', err.response?.data);
+      
+      const errorMessage = err.response?.data?.message || 
+                          err.response?.data?.error ||
+                          err.message ||
+                          'Failed to create issue';
+      
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getStatusBadge = (status) => {
     const variants = {
@@ -246,7 +246,7 @@ const [success, setSuccess] = useState(null);
 
       {/* Error Alert */}
       {error && (
-        <Alert type="warning" message={error} onClose={() => setError(null)} />
+        <Alert type="error" message={error} onClose={() => setError(null)} />
       )}
 
       {/* Success Alert */}
