@@ -33,74 +33,39 @@ export const Issues = () => {
     loadIssues();
   }, [currentPage, statusFilter]);
 
-  const loadIssues = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const response = await issueService.getAll(currentPage, pageSize, 'dateReported', 'DESC');
-      
-      console.log('📥 Response type:', typeof response.data);
-      
-      // Force parse if string
-      let data = response.data;
-      if (typeof data === 'string') {
-        console.log('⚠️ Parsing string response...');
-        try {
-          data = JSON.parse(data);
-          console.log('✅ Parsed successfully, type:', typeof data);
-        } catch (e) {
-          console.error('❌ Parse error:', e);
-          throw new Error('Invalid JSON from server');
-        }
-      }
-      
-      console.log('📥 Data after parsing:', Array.isArray(data) ? 'Array' : typeof data);
-      
-      // Handle response
+const loadIssues = async () => {
+  try {
+    setLoading(true);
+    setError(null);
+    
+    const response = await issueService.getAll(currentPage, pageSize, 'dateReported', 'DESC');
+    
+    // ✅ Handle paginated response correctly
+    if (response.data) {
       let issuesData = [];
       let pages = 1;
       
-      if (Array.isArray(data)) {
-        // Direct array response
-        issuesData = data;
+      if (response.data.content && Array.isArray(response.data.content)) {
+        // Backend returns: { content: [...], totalPages: 5, totalElements: 45 }
+        issuesData = response.data.content;
+        pages = response.data.totalPages || 1;
+      } else if (Array.isArray(response.data)) {
+        // Fallback if backend returns plain array
+        issuesData = response.data;
         pages = 1;
-        console.log('✅ Loaded', issuesData.length, 'issues');
-      } else if (data.content && Array.isArray(data.content)) {
-        // Paginated response
-        issuesData = data.content;
-        pages = data.totalPages || 1;
-        console.log('✅ Loaded', issuesData.length, 'issues, pages:', pages);
-      } else {
-        console.error('❌ Unexpected format');
-        console.error('Data:', data);
-        setError('Unexpected response format from server');
       }
       
       setIssues(issuesData);
       setTotalPages(pages);
-      
-      if (issuesData.length > 0) {
-        console.log('🎉 First issue:', issuesData[0]);
-      } else {
-        console.log('ℹ️ No issues');
-      }
-      
-    } catch (err) {
-      console.error('❌ Load error:', err);
-      console.error('Response:', err.response?.data);
-      
-      const errorMessage = err.response?.data?.message || 
-                          err.message ||
-                          'Failed to load issues';
-      
-      setError(errorMessage);
-      setIssues([]);
-      setTotalPages(1);
-    } finally {
-      setLoading(false);
     }
-  };
+    
+  } catch (err) {
+    console.error('Load error:', err);
+    setError('Failed to load issues');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleCreateIssue = async (issueData) => {
     try {
@@ -121,10 +86,16 @@ export const Issues = () => {
       console.error('❌ Create error:', err);
       console.error('Response:', err.response?.data);
       
-      const errorMessage = err.response?.data?.message || 
-                          err.response?.data?.error ||
-                          err.message ||
-                          'Failed to create issue';
+      // Handle tag validation errors specifically
+      let errorMessage = err.response?.data?.message || 
+                        err.response?.data?.error ||
+                        err.message ||
+                        'Failed to create issue';
+      
+      // Check for tag-related errors
+      if (errorMessage.includes('tag') || errorMessage.includes('Tag')) {
+        errorMessage = `Tag Error: ${errorMessage}. Please select only active tags.`;
+      }
       
       setError(errorMessage);
     } finally {

@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Input, Textarea, Select, Button, Alert } from '../common';
 import { locationService } from '../../services/locationService';
+import { tagService } from '../../services/tagService';
 import { useAuth } from '../../context/AuthContext';
+import { Tag as TagIcon, Check } from 'lucide-react';
 
 export const IssueForm = ({ onSubmit, onCancel, initialData = null, loading = false }) => {
   const { user } = useAuth();
@@ -15,10 +17,14 @@ export const IssueForm = ({ onSubmit, onCancel, initialData = null, loading = fa
   });
   const [locations, setLocations] = useState([]);
   const [loadingLocations, setLoadingLocations] = useState(true);
+  const [activeTags, setActiveTags] = useState([]);
+  const [loadingTags, setLoadingTags] = useState(true);
+  const [selectedTagIds, setSelectedTagIds] = useState([]);
   const [errors, setErrors] = useState({});
 
   useEffect(() => {
     loadLocations();
+    loadActiveTags();
     if (initialData) {
       setFormData({
         title: initialData.title || '',
@@ -28,6 +34,10 @@ export const IssueForm = ({ onSubmit, onCancel, initialData = null, loading = fa
         reportedById: initialData.reportedBy?.id || user?.id || '',
         photoUrl: initialData.photoUrl || ''
       });
+      // Set selected tags if editing
+      if (initialData.tags && Array.isArray(initialData.tags)) {
+        setSelectedTagIds(initialData.tags.map(tag => tag.id));
+      }
     } else {
       // Ensure reportedById is set
       setFormData(prev => ({
@@ -55,6 +65,45 @@ export const IssueForm = ({ onSubmit, onCancel, initialData = null, loading = fa
       ]);
     } finally {
       setLoadingLocations(false);
+    }
+  };
+
+  const loadActiveTags = async () => {
+    try {
+      setLoadingTags(true);
+      const response = await tagService.getActive();
+      
+      // Handle both array and paginated responses
+      let tagsData = [];
+      if (response.data) {
+        if (response.data.content && Array.isArray(response.data.content)) {
+          tagsData = response.data.content;
+        } else if (Array.isArray(response.data)) {
+          tagsData = response.data;
+        }
+      }
+      
+      setActiveTags(tagsData);
+      console.log('✅ Loaded active tags:', tagsData.length);
+    } catch (error) {
+      console.error('Error loading active tags:', error);
+      setActiveTags([]);
+    } finally {
+      setLoadingTags(false);
+    }
+  };
+
+  const handleTagToggle = (tagId) => {
+    setSelectedTagIds(prev => {
+      if (prev.includes(tagId)) {
+        return prev.filter(id => id !== tagId);
+      } else {
+        return [...prev, tagId];
+      }
+    });
+    // Clear tag errors when user selects/deselects
+    if (errors.tags) {
+      setErrors(prev => ({ ...prev, tags: '' }));
     }
   };
 
@@ -114,7 +163,8 @@ export const IssueForm = ({ onSubmit, onCancel, initialData = null, loading = fa
         category: formData.category,
         locationId: formData.locationId,
         reportedById: formData.reportedById || user?.id,
-        photoUrl: formData.photoUrl.trim() || null
+        photoUrl: formData.photoUrl.trim() || null,
+        tagIds: selectedTagIds // Include selected tag IDs
       };
       
       console.log('Submitting issue:', submitData); // Debug
@@ -184,6 +234,68 @@ export const IssueForm = ({ onSubmit, onCancel, initialData = null, loading = fa
         placeholder="https://example.com/photo.jpg"
         disabled={loading}
       />
+
+      {/* Tag Selection */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Tags (Optional)
+          <span className="text-xs text-gray-500 ml-2">Select tags to categorize this issue</span>
+        </label>
+        {loadingTags ? (
+          <div className="text-sm text-gray-500 py-2">Loading tags...</div>
+        ) : activeTags.length > 0 ? (
+          <div className="border border-gray-300 rounded-lg p-3 max-h-48 overflow-y-auto">
+            <div className="grid grid-cols-1 gap-2">
+              {activeTags.map((tag) => {
+                const isSelected = selectedTagIds.includes(tag.id);
+                return (
+                  <label
+                    key={tag.id}
+                    className={`
+                      flex items-start gap-3 p-2 rounded-lg cursor-pointer transition-colors
+                      ${isSelected 
+                        ? 'bg-blue-50 border border-blue-200' 
+                        : 'hover:bg-gray-50 border border-transparent'
+                      }
+                    `}
+                  >
+                    <div className="flex items-center mt-0.5">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleTagToggle(tag.id)}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        disabled={loading}
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <TagIcon size={14} className="text-gray-400 flex-shrink-0" />
+                        <span className={`text-sm font-medium ${isSelected ? 'text-blue-900' : 'text-gray-900'}`}>
+                          {tag.name}
+                        </span>
+                        {isSelected && (
+                          <Check size={14} className="text-blue-600 flex-shrink-0" />
+                        )}
+                      </div>
+                      {tag.description && (
+                        <p className="text-xs text-gray-500 mt-0.5">{tag.description}</p>
+                      )}
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <div className="text-sm text-gray-500 py-2 border border-gray-300 rounded-lg p-3 text-center">
+            No tags available
+          </div>
+        )}
+        {errors.tags && (
+          <p className="text-sm text-red-600 mt-1">{errors.tags}</p>
+        )}
+      </div>
 
       <div className="flex gap-3 pt-4">
         <Button

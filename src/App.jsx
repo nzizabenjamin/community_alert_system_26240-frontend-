@@ -6,11 +6,19 @@ import { TestPage } from './pages/TestPage';
 import { Dashboard } from './pages/Dashboard';
 import { Issues } from './pages/Issues';
 import { IssueDetail } from './pages/IssueDetail';
+import { Users } from './pages/Users';
+import { Locations } from './pages/Locations';
+import { Tags } from './pages/Tags';
+import { Notifications } from './pages/Notifications';
+import { Login } from './pages/auth/Login';
+import { SignUp } from './pages/auth/SignUp';
+import { ForgotPassword } from './pages/auth/ForgotPassword';
+import { ResetPassword } from './pages/auth/ResetPassword';
 import { ROUTES } from './utils/constants';
 
 // Protected Route Component
-const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, loading } = useAuth();
+const ProtectedRoute = ({ children, adminOnly = false }) => {
+  const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
     return (
@@ -24,101 +32,11 @@ const ProtectedRoute = ({ children }) => {
     return <Navigate to={ROUTES.LOGIN} replace />;
   }
 
-  return <Layout>{children}</Layout>;
-};
-
-// Login Page Component
-const LoginPage = () => {
-  const { login, isAuthenticated } = useAuth();
-  const [email, setEmail] = React.useState('admin@cas.com');
-  const [password, setPassword] = React.useState('password');
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState('');
-
-  if (isAuthenticated) {
+  if (adminOnly && user?.role !== 'ADMIN') {
     return <Navigate to={ROUTES.DASHBOARD} replace />;
   }
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    
-    try {
-      await login(email, password);
-    } catch (err) {
-      setError('Login failed. Please try again.');
-      console.error('Login error:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
-        <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">CAS</h1>
-          <h2 className="text-xl font-semibold text-gray-700 mt-2">
-            Community Alert System
-          </h2>
-          <p className="text-sm text-gray-500 mt-1">Sign in to continue</p>
-        </div>
-
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="your@email.com"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="••••••••"
-              required
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:bg-blue-400 disabled:cursor-not-allowed"
-          >
-            {loading ? 'Signing in...' : 'Sign In'}
-          </button>
-        </form>
-
-        <div className="mt-6 text-center text-sm text-gray-600">
-          <p>Demo credentials:</p>
-          <p className="font-mono text-xs mt-1 bg-gray-50 p-2 rounded">
-            Email: admin@cas.com<br />
-            Password: password
-          </p>
-        </div>
-      </div>
-    </div>
-  );
+  return <Layout>{children}</Layout>;
 };
 
 function App() {
@@ -126,8 +44,13 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <Routes>
-          <Route path={ROUTES.LOGIN} element={<LoginPage />} />
+          {/* Public Routes */}
+          <Route path={ROUTES.LOGIN} element={<Login />} />
+          <Route path={ROUTES.SIGNUP} element={<SignUp />} />
+          <Route path={ROUTES.FORGOT_PASSWORD} element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           
+          {/* Protected Routes */}
           <Route
             path={ROUTES.DASHBOARD}
             element={
@@ -151,6 +74,42 @@ function App() {
             element={
               <ProtectedRoute>
                 <IssueDetail />
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path={ROUTES.USERS}
+            element={
+              <ProtectedRoute adminOnly>
+                <Users />
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path={ROUTES.LOCATIONS}
+            element={
+              <ProtectedRoute>
+                <Locations />
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path={ROUTES.TAGS}
+            element={
+              <ProtectedRoute>
+                <Tags />
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path={ROUTES.NOTIFICATIONS}
+            element={
+              <ProtectedRoute>
+                <Notifications />
               </ProtectedRoute>
             }
           />

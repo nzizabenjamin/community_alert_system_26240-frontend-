@@ -1,19 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { StatCard, Card, Table, Badge, Button, Alert } from '../components/common';
-import { AlertCircle, Users, CheckCircle, TrendingUp, Plus, Clock } from 'lucide-react';
-import { issueService } from '../services/issueService';
-import { useNavigate } from 'react-router-dom';
-import { ROUTES } from '../utils/constants';
+import { Card, Badge, Button } from '../components/common';
+import { 
+  AlertCircle, 
+  CheckCircle, 
+  Clock, 
+  Users, 
+  MapPin, 
+  TrendingUp,
+  Activity,
+  FileText
+} from 'lucide-react';
+import { dashboardService } from '../services/dashboardService';
+import { useAuth } from '../context/AuthContext';
 
 export const Dashboard = () => {
-  const navigate = useNavigate();
+  const { user } = useAuth();
   const [stats, setStats] = useState({
     totalIssues: 0,
-    resolvedIssues: 0,
+    reportedIssues: 0,
     inProgressIssues: 0,
-    reportedIssues: 0
+    resolvedIssues: 0,
+    totalUsers: 0,
+    totalLocations: 0,
+    recentIssues: [],
+    issuesByCategory: [],
+    issuesByLocation: []
   });
-  const [recentIssues, setRecentIssues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -24,123 +36,110 @@ export const Dashboard = () => {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      setError(null);
-      
-      // Fetch recent issues (first page, 5 items)
-      const response = await issueService.getAll(0, 5, 'dateReported', 'DESC');
-      
-      if (response.data && Array.isArray(response.data)) {
-        setRecentIssues(response.data);
-        
-        // Calculate stats from the data
-        // In a real app, you'd have a separate stats endpoint
-        const total = response.data.length;
-        const resolved = response.data.filter(i => i.status === 'RESOLVED').length;
-        const inProgress = response.data.filter(i => i.status === 'IN_PROGRESS').length;
-        const reported = response.data.filter(i => i.status === 'REPORTED').length;
-        
-        setStats({
-          totalIssues: total,
-          resolvedIssues: resolved,
-          inProgressIssues: inProgress,
-          reportedIssues: reported
-        });
-      }
+      const response = await dashboardService.getStats();
+      setStats(response.data || {});
     } catch (err) {
-      console.error('Error loading dashboard:', err);
-      setError('Failed to load dashboard data. Using demo data.');
-      
-      // Demo data for development
-      setStats({
-        totalIssues: 247,
-        resolvedIssues: 189,
-        inProgressIssues: 35,
-        reportedIssues: 23
-      });
-      
-      setRecentIssues([
-        { 
-          id: '1', 
-          title: 'Road Damage on Main Street', 
-          status: 'REPORTED', 
-          dateReported: new Date().toISOString(),
-          category: 'Infrastructure',
-          location: { name: 'Kigali' }
-        },
-        { 
-          id: '2', 
-          title: 'Water Supply Issue', 
-          status: 'IN_PROGRESS', 
-          dateReported: new Date(Date.now() - 86400000).toISOString(),
-          category: 'Utilities',
-          location: { name: 'Nyanza' }
-        },
-        { 
-          id: '3', 
-          title: 'Street Light Not Working', 
-          status: 'RESOLVED', 
-          dateReported: new Date(Date.now() - 172800000).toISOString(),
-          category: 'Infrastructure',
-          location: { name: 'Musanze' }
-        }
-      ]);
+      setError('Failed to load dashboard data');
+      console.error('Dashboard error:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const getStatusBadge = (status) => {
-    const variants = {
-      REPORTED: 'primary',
-      IN_PROGRESS: 'warning',
-      RESOLVED: 'success'
-    };
-    return <Badge variant={variants[status] || 'default'}>{status.replace('_', ' ')}</Badge>;
-  };
-
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric', 
-      year: 'numeric' 
-    });
-  };
-
-  const issueColumns = [
-    { 
-      header: 'Title', 
-      accessor: 'title',
-      render: (row) => (
+  const StatCard = ({ title, value, icon: Icon, color, trend, description }) => (
+    <Card className="hover:shadow-lg transition-shadow duration-200">
+      <div className="flex items-center justify-between">
         <div>
-          <p className="font-medium text-gray-900">{row.title}</p>
-          <p className="text-xs text-gray-500">{row.category}</p>
+          <p className="text-sm font-medium text-gray-600 mb-1">{title}</p>
+          <p className="text-3xl font-bold text-gray-900">{value}</p>
+          {description && (
+            <p className="text-xs text-gray-500 mt-1">{description}</p>
+          )}
+          {trend && (
+            <div className="flex items-center gap-1 mt-2">
+              <TrendingUp size={14} className={trend > 0 ? 'text-green-500' : 'text-red-500'} />
+              <span className={`text-xs font-medium ${trend > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {Math.abs(trend)}% from last month
+              </span>
+            </div>
+          )}
         </div>
-      )
-    },
-    { 
-      header: 'Location', 
-      accessor: 'location',
-      render: (row) => row.location?.name || 'N/A'
-    },
-    { 
-      header: 'Status', 
-      render: (row) => getStatusBadge(row.status)
-    },
-    { 
-      header: 'Reported', 
-      accessor: 'dateReported',
-      render: (row) => formatDate(row.dateReported)
-    }
-  ];
+        <div className={`p-4 rounded-full ${color}`}>
+          <Icon size={24} className="text-white" />
+        </div>
+      </div>
+    </Card>
+  );
+
+  const RecentIssueCard = ({ issue }) => {
+    const getStatusColor = (status) => {
+      switch (status) {
+        case 'REPORTED': return 'primary';
+        case 'IN_PROGRESS': return 'warning';
+        case 'RESOLVED': return 'success';
+        default: return 'default';
+      }
+    };
+
+    const timeAgo = (date) => {
+      const now = new Date();
+      const past = new Date(date);
+      const diffMs = now - past;
+      const diffHours = Math.floor(diffMs / 3600000);
+      const diffDays = Math.floor(diffMs / 86400000);
+      
+      if (diffHours < 24) return `${diffHours}h ago`;
+      return `${diffDays}d ago`;
+    };
+
+    return (
+      <div className="p-4 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <p className="font-medium text-gray-900">{issue.title}</p>
+            <div className="flex items-center gap-3 mt-2">
+              <span className="text-sm text-gray-600 flex items-center gap-1">
+                <MapPin size={14} />
+                {issue.location?.name || 'Unknown'}
+              </span>
+              <span className="text-sm text-gray-500">{timeAgo(issue.dateReported)}</span>
+            </div>
+          </div>
+          <Badge variant={getStatusColor(issue.status)}>
+            {issue.status.replace('_', ' ')}
+          </Badge>
+        </div>
+      </div>
+    );
+  };
+
+  const CategoryChart = ({ categories }) => {
+    const maxValue = Math.max(...categories.map(c => c.count), 1);
+    
+    return (
+      <div className="space-y-3">
+        {categories.map((category) => (
+          <div key={category.name}>
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-sm font-medium text-gray-700">{category.name}</span>
+              <span className="text-sm text-gray-600">{category.count}</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div
+                className="bg-blue-600 h-2 rounded-full transition-all duration-500"
+                style={{ width: `${(category.count / maxValue) * 100}%` }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading dashboard...</p>
-        </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     );
   }
@@ -148,149 +147,147 @@ export const Dashboard = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-600 mt-1">Welcome back! Here's what's happening.</p>
-        </div>
-        <Button 
-          variant="primary" 
-          icon={Plus}
-          onClick={() => navigate(ROUTES.ISSUES)}
-        >
-          Report Issue
-        </Button>
+      <div>
+        <h1 className="text-3xl font-bold text-gray-900">
+          Welcome back, {user?.fullName || 'User'}!
+        </h1>
+        <p className="text-gray-600 mt-1">
+          Here's what's happening with your community today
+        </p>
       </div>
 
-      {/* Error Alert */}
       {error && (
-        <Alert type="warning" message={error} onClose={() => setError(null)} />
+        <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg">
+          {error}
+        </div>
       )}
 
-      {/* Stats Cards */}
+      {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
           title="Total Issues"
-          value={stats.totalIssues}
-          icon={AlertCircle}
+          value={stats.totalIssues || 0}
+          icon={FileText}
+          color="bg-blue-500"
           trend={12}
-          color="blue"
-        />
-        <StatCard
-          title="Resolved"
-          value={stats.resolvedIssues}
-          icon={CheckCircle}
-          trend={8}
-          color="green"
-        />
-        <StatCard
-          title="In Progress"
-          value={stats.inProgressIssues}
-          icon={Clock}
-          trend={-3}
-          color="yellow"
         />
         <StatCard
           title="Reported"
-          value={stats.reportedIssues}
-          icon={TrendingUp}
-          trend={5}
-          color="red"
+          value={stats.reportedIssues || 0}
+          icon={AlertCircle}
+          color="bg-orange-500"
+          description="Awaiting review"
+        />
+        <StatCard
+          title="In Progress"
+          value={stats.inProgressIssues || 0}
+          icon={Clock}
+          color="bg-yellow-500"
+          description="Being handled"
+        />
+        <StatCard
+          title="Resolved"
+          value={stats.resolvedIssues || 0}
+          icon={CheckCircle}
+          color="bg-green-500"
+          trend={8}
         />
       </div>
 
-      {/* Recent Issues Table */}
-      <Card 
-        title="Recent Issues"
-        action={
-          <Button 
-            variant="ghost" 
-            size="sm"
-            onClick={() => navigate(ROUTES.ISSUES)}
-          >
-            View All
-          </Button>
-        }
-        noPadding
-      >
-        {recentIssues.length > 0 ? (
-          <Table
-            columns={issueColumns}
-            data={recentIssues}
-            onRowClick={(row) => navigate(`${ROUTES.ISSUES}/${row.id}`)}
-          />
-        ) : (
-          <div className="p-12 text-center text-gray-500">
-            <AlertCircle className="mx-auto mb-4 text-gray-400" size={48} />
-            <p>No issues reported yet</p>
-            <Button 
-              variant="primary" 
-              className="mt-4"
-              onClick={() => navigate(ROUTES.ISSUES)}
-            >
-              Report First Issue
-            </Button>
-          </div>
-        )}
-      </Card>
-
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card title="Issue Categories">
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">Infrastructure</span>
-              <div className="flex items-center gap-2">
-                <div className="w-48 h-2 bg-gray-200 rounded-full overflow-hidden">
-                  <div className="h-full bg-blue-600" style={{ width: '65%' }}></div>
-                </div>
-                <span className="text-sm font-medium text-gray-900 w-12">65%</span>
-              </div>
+      {/* System Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card>
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-purple-100 rounded-full">
+              <Users size={24} className="text-purple-600" />
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">Utilities</span>
-              <div className="flex items-center gap-2">
-                <div className="w-48 h-2 bg-gray-200 rounded-full overflow-hidden">
-                  <div className="h-full bg-green-600" style={{ width: '25%' }}></div>
-                </div>
-                <span className="text-sm font-medium text-gray-900 w-12">25%</span>
-              </div>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">Safety</span>
-              <div className="flex items-center gap-2">
-                <div className="w-48 h-2 bg-gray-200 rounded-full overflow-hidden">
-                  <div className="h-full bg-yellow-600" style={{ width: '10%' }}></div>
-                </div>
-                <span className="text-sm font-medium text-gray-900 w-12">10%</span>
-              </div>
+            <div>
+              <p className="text-sm text-gray-600">Total Users</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.totalUsers || 0}</p>
             </div>
           </div>
         </Card>
-
-        <Card title="Response Time">
-          <div className="space-y-4">
-            <div>
-              <div className="flex justify-between text-sm mb-1">
-                <span className="text-gray-600">Average Response</span>
-                <span className="font-medium">2.5 hours</span>
-              </div>
-              <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div className="h-full bg-green-600" style={{ width: '75%' }}></div>
-              </div>
+        <Card>
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-indigo-100 rounded-full">
+              <MapPin size={24} className="text-indigo-600" />
             </div>
             <div>
-              <div className="flex justify-between text-sm mb-1">
-                <span className="text-gray-600">Average Resolution</span>
-                <span className="font-medium">24 hours</span>
-              </div>
-              <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div className="h-full bg-blue-600" style={{ width: '60%' }}></div>
-              </div>
+              <p className="text-sm text-gray-600">Locations</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.totalLocations || 0}</p>
+            </div>
+          </div>
+        </Card>
+        <Card>
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-pink-100 rounded-full">
+              <Activity size={24} className="text-pink-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Resolution Rate</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {stats.totalIssues > 0 
+                  ? Math.round((stats.resolvedIssues / stats.totalIssues) * 100) 
+                  : 0}%
+              </p>
             </div>
           </div>
         </Card>
       </div>
+
+      {/* Charts and Recent Activity */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Issues by Category */}
+        <Card>
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Issues by Category</h2>
+          {stats.issuesByCategory && stats.issuesByCategory.length > 0 ? (
+            <CategoryChart categories={stats.issuesByCategory} />
+          ) : (
+            <p className="text-gray-500 text-center py-8">No data available</p>
+          )}
+        </Card>
+
+        {/* Recent Issues */}
+        <Card noPadding>
+          <div className="p-6 border-b border-gray-200">
+            <h2 className="text-xl font-bold text-gray-900">Recent Issues</h2>
+          </div>
+          <div className="max-h-96 overflow-y-auto">
+            {stats.recentIssues && stats.recentIssues.length > 0 ? (
+              stats.recentIssues.map((issue) => (
+                <RecentIssueCard key={issue.id} issue={issue} />
+              ))
+            ) : (
+              <p className="text-gray-500 text-center py-8">No recent issues</p>
+            )}
+          </div>
+        </Card>
+      </div>
+
+      {/* Top Locations */}
+      {stats.issuesByLocation && stats.issuesByLocation.length > 0 && (
+        <Card>
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Top Locations by Issues</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {stats.issuesByLocation.slice(0, 6).map((loc, index) => (
+              <div 
+                key={loc.name} 
+                className="p-4 bg-gray-50 rounded-lg border border-gray-200"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl font-bold text-gray-400">#{index + 1}</span>
+                    <div>
+                      <p className="font-medium text-gray-900">{loc.name}</p>
+                      <p className="text-sm text-gray-600">{loc.count} issues</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
     </div>
   );
 };

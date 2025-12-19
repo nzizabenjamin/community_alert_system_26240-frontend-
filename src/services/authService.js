@@ -3,35 +3,71 @@ import api from './api';
 export const authService = {
   login: async (email, password) => {
     try {
-      // TODO: Replace with actual auth endpoint when backend is ready
-      // const response = await api.post('/auth/login', { email, password });
+      const response = await api.post('/auth/login', { email, password });
       
-      // For now, fetch a real user from the backend
-      const usersResponse = await api.get('/users');
-      const users = usersResponse.data;
-      const user = users.find(u => u.email === email);
-      
-      if (user) {
-        localStorage.setItem('user', JSON.stringify(user));
-        localStorage.setItem('token', 'mock-jwt-token');
-        return { data: user };
-      } else {
-        throw new Error('User not found');
+      // Check if 2FA is required
+      if (response.data.requiresOTP) {
+        return {
+          data: {
+            requiresOTP: true,
+            tempToken: response.data.tempToken,
+            email: email,
+            otp: response.data.otp // Backend may include OTP for development/testing
+          }
+        };
       }
+      
+      // Normal login - store token and user
+      localStorage.setItem('token', response.data.token);
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+      return { data: response.data.user };
     } catch (error) {
       console.error('Login error:', error);
-      // Fallback mock user
-      const mockUser = {
-        id: '2626b831-70d3-4cf5-9ab2-f9608a918a44', // Use a valid UUID format
-        fullName: 'Marie Uwase',
-        email: email,
-        role: 'ADMIN'
-      };
-      
-      localStorage.setItem('user', JSON.stringify(mockUser));
-      localStorage.setItem('token', 'mock-jwt-token');
-      
-      return { data: mockUser };
+      throw error;
+    }
+  },
+
+  verifyOTP: async (tempToken, otpCode) => {
+    try {
+      const response = await api.post('/auth/verify-otp', { tempToken, otpCode });
+      localStorage.setItem('token', response.data.token);
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+      return { data: response.data.user };
+    } catch (error) {
+      console.error('OTP verification error:', error);
+      throw error;
+    }
+  },
+
+  signup: async (userData) => {
+    try {
+      const response = await api.post('/auth/signup', userData);
+      localStorage.setItem('token', response.data.token);
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+      return { data: response.data.user };
+    } catch (error) {
+      console.error('Signup error:', error);
+      throw error;
+    }
+  },
+
+  forgotPassword: async (email) => {
+    try {
+      const response = await api.post('/auth/forgot-password', { email });
+      return response.data;
+    } catch (error) {
+      console.error('Forgot password error:', error);
+      throw error;
+    }
+  },
+
+  resetPassword: async (token, newPassword) => {
+    try {
+      const response = await api.post('/auth/reset-password', { token, newPassword });
+      return response.data;
+    } catch (error) {
+      console.error('Reset password error:', error);
+      throw error;
     }
   },
 
