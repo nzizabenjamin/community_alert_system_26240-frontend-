@@ -15,6 +15,7 @@ import { issueService } from '../services/issueService';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '../utils/constants';
 import { IssueForm } from '../components/features';
+import api from '../services/api';
 
 export const Issues = () => {
   const navigate = useNavigate();
@@ -38,7 +39,26 @@ const loadIssues = async () => {
     setLoading(true);
     setError(null);
     
-    const response = await issueService.getAll(currentPage, pageSize, 'dateReported', 'DESC');
+    let response;
+    
+    // Try with pagination first
+    try {
+      response = await issueService.getAll(currentPage, pageSize, 'dateReported', 'DESC');
+    } catch (paginationError) {
+      // If pagination fails with 500, try without pagination parameters
+      if (paginationError.response?.status === 500) {
+        console.warn('Pagination request failed, trying simple request:', paginationError);
+        try {
+          // Try simple GET without pagination
+          response = await api.get('/issues');
+        } catch (simpleError) {
+          // If both fail, throw the original error
+          throw paginationError;
+        }
+      } else {
+        throw paginationError;
+      }
+    }
     
     // ✅ Handle paginated response correctly
     if (response.data) {
@@ -50,18 +70,47 @@ const loadIssues = async () => {
         issuesData = response.data.content;
         pages = response.data.totalPages || 1;
       } else if (Array.isArray(response.data)) {
-        // Fallback if backend returns plain array
+        // Backend returns plain array
         issuesData = response.data;
         pages = 1;
       }
       
       setIssues(issuesData);
       setTotalPages(pages);
+      console.log('✅ Loaded issues:', issuesData.length);
+    } else {
+      setIssues([]);
+      setTotalPages(1);
+      console.warn('⚠️ No data in response:', response);
     }
     
   } catch (err) {
-    console.error('Load error:', err);
-    setError('Failed to load issues');
+    console.error('❌ Load issues error:', err);
+    console.error('Error details:', {
+      status: err.response?.status,
+      statusText: err.response?.statusText,
+      data: err.response?.data,
+      message: err.message,
+      url: err.config?.url,
+      params: err.config?.params
+    });
+    
+    // More detailed error message
+    let errorMessage = 'Failed to load issues';
+    if (err.response?.status === 500) {
+      errorMessage = 'Server error: The issues service encountered an error. This is a backend issue. Please check your backend logs.';
+    } else if (err.response?.status === 404) {
+      errorMessage = 'Issues endpoint not found. The backend may not have this feature implemented yet.';
+    } else if (err.response?.data?.message) {
+      errorMessage = `Failed to load issues: ${err.response.data.message}`;
+    } else if (err.message) {
+      errorMessage = `Failed to load issues: ${err.message}`;
+    }
+    
+    setError(errorMessage);
+    // Set empty array so UI doesn't break
+    setIssues([]);
+    setTotalPages(1);
   } finally {
     setLoading(false);
   }
@@ -253,6 +302,23 @@ const loadIssues = async () => {
 
       {/* Issues Table */}
       <Card noPadding>
+        {error && error.includes('Server error') && (
+          <div className="p-4 bg-yellow-50 border-b border-yellow-200">
+            <p className="text-sm text-yellow-800">
+              <strong>⚠️ Backend Error (500):</strong> The issues service is encountering a server-side error. 
+              This typically means:
+            </p>
+            <ul className="text-sm text-yellow-700 mt-2 ml-4 list-disc">
+              <li>Database connection issue</li>
+              <li>Missing required data or relationships</li>
+              <li>Backend code error (check backend logs)</li>
+              <li>Pagination parameters not supported (trying fallback...)</li>
+            </ul>
+            <p className="text-xs text-yellow-600 mt-2">
+              Check your backend console/logs for detailed error information.
+            </p>
+          </div>
+        )}
         <Table
           columns={issueColumns}
           data={filteredIssues}

@@ -4,7 +4,12 @@ export const issueService = {
   // Get all issues with pagination
   getAll: (page = 0, size = 10, sort = 'dateReported', direction = 'DESC') => {
     return api.get('/issues', {
-      params: { page, size, sort, direction }
+      params: { 
+        page, 
+        size, 
+        sort, 
+        direction
+      }
     });
   },
 
