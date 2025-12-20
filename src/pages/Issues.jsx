@@ -152,9 +152,9 @@ const loadIssues = async () => {
       
       // Handle tag validation errors specifically
       let errorMessage = err.response?.data?.message || 
-                        err.response?.data?.error ||
-                        err.message ||
-                        'Failed to create issue';
+                          err.response?.data?.error ||
+                          err.message ||
+                          'Failed to create issue';
       
       // Check for tag-related errors
       if (errorMessage.includes('tag') || errorMessage.includes('Tag')) {

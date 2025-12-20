@@ -208,8 +208,8 @@ export const IssueForm = ({ onSubmit, onCancel, initialData = null, loading = fa
           onLocationChange={handleLocationChange}
           selectedVillageCode={formData.villageCode}
           error={errors.villageCode}
-          required
-        />
+        required
+      />
       </div>
 
       <Textarea
