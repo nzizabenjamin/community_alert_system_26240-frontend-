@@ -12,9 +12,12 @@ import {
 } from 'lucide-react';
 import { dashboardService } from '../services/dashboardService';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { ROUTES } from '../utils/constants';
 
 export const Dashboard = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [stats, setStats] = useState({
     totalIssues: 0,
     reportedIssues: 0,
@@ -116,19 +119,56 @@ export const Dashboard = () => {
   const CategoryChart = ({ categories }) => {
     const maxValue = Math.max(...categories.map(c => c.count), 1);
     
+    // Category descriptions
+    const categoryDescriptions = {
+      'Infrastructure': 'Roads, bridges, buildings, and public facilities',
+      'Utilities': 'Water, electricity, internet, and other essential services',
+      'Safety': 'Security concerns, emergency situations, and public safety',
+      'Sanitation': 'Waste management, cleanliness, and hygiene',
+      'Environment': 'Environmental issues, pollution, and conservation',
+      'Other': 'Other types of issues not covered above'
+    };
+    
     return (
-      <div className="space-y-3">
+      <div className="space-y-4">
         {categories.map((category) => (
-          <div key={category.name}>
-            <div className="flex justify-between items-center mb-1">
-              <span className="text-sm font-medium text-gray-700">{category.name}</span>
-              <span className="text-sm text-gray-600">{category.count}</span>
+          <div key={category.name} className="group">
+            <div className="flex items-start justify-between mb-2">
+              <div className="flex items-start gap-3 flex-1">
+                {/* Category indicator line/bar preview */}
+                <div className="flex-shrink-0 mt-1">
+                  <div 
+                    className="w-3 h-3 rounded-sm bg-blue-600"
+                    title={category.name}
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-semibold text-gray-900">{category.name}</span>
+                  {categoryDescriptions[category.name] && (
+                    <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                      {categoryDescriptions[category.name]}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <span className="text-sm font-bold text-gray-900 ml-2 flex-shrink-0">
+                {category.count}
+              </span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
+            <div className="w-full bg-gray-200 rounded-full h-2.5 relative">
               <div
-                className="bg-blue-600 h-2 rounded-full transition-all duration-500"
-                style={{ width: `${(category.count / maxValue) * 100}%` }}
-              />
+                className="h-2.5 rounded-full transition-all duration-500 flex items-center pl-2"
+                style={{ 
+                  width: `${(category.count / maxValue) * 100}%`,
+                  backgroundColor: '#2563eb' // blue-600
+                }}
+              >
+                {category.count > 0 && (
+                  <span className="text-[10px] font-medium text-white whitespace-nowrap">
+                    {category.name}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         ))}
@@ -194,46 +234,54 @@ export const Dashboard = () => {
         />
       </div>
 
-      {/* System Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-purple-100 rounded-full">
-              <Users size={24} className="text-purple-600" />
+      {/* System Overview - Only for ADMIN */}
+      {user?.role === 'ADMIN' && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card 
+            className="hover:shadow-lg transition-shadow duration-200 cursor-pointer"
+            onClick={() => navigate(ROUTES.USERS)}
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-purple-100 rounded-full">
+                <Users size={24} className="text-purple-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Total Users</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.totalUsers || 0}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm text-gray-600">Total Users</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalUsers || 0}</p>
+          </Card>
+          <Card 
+            className="hover:shadow-lg transition-shadow duration-200 cursor-pointer"
+            onClick={() => navigate(ROUTES.LOCATIONS)}
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-indigo-100 rounded-full">
+                <MapPin size={24} className="text-indigo-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Locations</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.totalLocations || 0}</p>
+              </div>
             </div>
-          </div>
-        </Card>
-        <Card>
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-indigo-100 rounded-full">
-              <MapPin size={24} className="text-indigo-600" />
+          </Card>
+          <Card className="hover:shadow-lg transition-shadow duration-200">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-pink-100 rounded-full">
+                <Activity size={24} className="text-pink-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Resolution Rate</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {stats.totalIssues > 0 
+                    ? Math.round((stats.resolvedIssues / stats.totalIssues) * 100) 
+                    : 0}%
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm text-gray-600">Locations</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalLocations || 0}</p>
-            </div>
-          </div>
-        </Card>
-        <Card>
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-pink-100 rounded-full">
-              <Activity size={24} className="text-pink-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Resolution Rate</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {stats.totalIssues > 0 
-                  ? Math.round((stats.resolvedIssues / stats.totalIssues) * 100) 
-                  : 0}%
-              </p>
-            </div>
-          </div>
-        </Card>
-      </div>
+          </Card>
+        </div>
+      )}
 
       {/* Charts and Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

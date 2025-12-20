@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Input, Textarea, Select, Button, Alert } from '../common';
-import { locationService } from '../../services/locationService';
 import { tagService } from '../../services/tagService';
 import { useAuth } from '../../context/AuthContext';
 import { Tag as TagIcon, Check } from 'lucide-react';
+import { LocationSelector } from './LocationSelector';
 
 export const IssueForm = ({ onSubmit, onCancel, initialData = null, loading = false }) => {
   const { user } = useAuth();
@@ -11,26 +11,26 @@ export const IssueForm = ({ onSubmit, onCancel, initialData = null, loading = fa
     title: '',
     description: '',
     category: '',
-    locationId: '',
+    villageCode: null,
+    locationString: '',
+    locationData: null, // Store full location data
     reportedById: user?.id || '',
     photoUrl: ''
   });
-  const [locations, setLocations] = useState([]);
-  const [loadingLocations, setLoadingLocations] = useState(true);
   const [activeTags, setActiveTags] = useState([]);
   const [loadingTags, setLoadingTags] = useState(true);
   const [selectedTagIds, setSelectedTagIds] = useState([]);
   const [errors, setErrors] = useState({});
 
   useEffect(() => {
-    loadLocations();
     loadActiveTags();
     if (initialData) {
       setFormData({
         title: initialData.title || '',
         description: initialData.description || '',
         category: initialData.category || '',
-        locationId: initialData.location?.id || '',
+        villageCode: initialData.location?.villageCode || null,
+        locationString: initialData.location?.locationString || '',
         reportedById: initialData.reportedBy?.id || user?.id || '',
         photoUrl: initialData.photoUrl || ''
       });
@@ -46,27 +46,6 @@ export const IssueForm = ({ onSubmit, onCancel, initialData = null, loading = fa
       }));
     }
   }, [initialData, user]);
-
-  const loadLocations = async () => {
-    try {
-      const response = await locationService.getAll();
-      console.log('Locations response:', response.data); // Debug
-      
-      // Handle array or object response
-      const locationData = Array.isArray(response.data) ? response.data : [];
-      setLocations(locationData);
-    } catch (error) {
-      console.error('Error loading locations:', error);
-      // Fallback demo locations
-      setLocations([
-        { id: 'loc1', name: 'Kigali', type: 'PROVINCE' },
-        { id: 'loc2', name: 'Nyanza', type: 'DISTRICT' },
-        { id: 'loc3', name: 'Musanze', type: 'DISTRICT' }
-      ]);
-    } finally {
-      setLoadingLocations(false);
-    }
-  };
 
   const loadActiveTags = async () => {
     try {
@@ -117,13 +96,19 @@ export const IssueForm = ({ onSubmit, onCancel, initialData = null, loading = fa
     { value: 'Other', label: 'Other' }
   ];
 
-  const locationOptions = [
-    { value: '', label: 'Select a location' },
-    ...locations.map(loc => ({
-      value: loc.id,
-      label: `${loc.name} (${loc.type || 'Location'})`
-    }))
-  ];
+  const handleLocationChange = (locationData) => {
+    setFormData(prev => ({
+      ...prev,
+      villageCode: locationData.villageCode,
+      locationString: locationData.locationString,
+      // Store full location data in case backend needs it
+      locationData: locationData
+    }));
+    // Clear location error when location is selected
+    if (errors.villageCode) {
+      setErrors(prev => ({ ...prev, villageCode: '' }));
+    }
+  };
 
   const validate = () => {
     const newErrors = {};
@@ -144,8 +129,8 @@ export const IssueForm = ({ onSubmit, onCancel, initialData = null, loading = fa
       newErrors.category = 'Category is required';
     }
 
-    if (!formData.locationId) {
-      newErrors.locationId = 'Location is required';
+    if (!formData.villageCode) {
+      newErrors.villageCode = 'Location is required. Please select all location levels (Province, District, Sector, Cell, Village).';
     }
 
     setErrors(newErrors);
@@ -157,15 +142,26 @@ export const IssueForm = ({ onSubmit, onCancel, initialData = null, loading = fa
     
     if (validate()) {
       // Prepare data for backend
+      // Note: The backend might expect either:
+      // 1. locationId (UUID) - legacy format
+      // 2. villageCode (integer) - new Rwanda location hierarchy format
+      // We're using villageCode as per the location selector guide
       const submitData = {
         title: formData.title.trim(),
         description: formData.description.trim(),
         category: formData.category,
-        locationId: formData.locationId,
+        villageCode: Number(formData.villageCode), // Ensure it's a number, not string
         reportedById: formData.reportedById || user?.id,
-        photoUrl: formData.photoUrl.trim() || null,
-        tagIds: selectedTagIds // Include selected tag IDs
+        tagIds: selectedTagIds.length > 0 ? selectedTagIds : [] // Always send array, even if empty
       };
+      
+      // Only include photoUrl if it's not empty
+      const photoUrl = formData.photoUrl?.trim();
+      if (photoUrl) {
+        submitData.photoUrl = photoUrl;
+      }
+      
+      console.log('📋 Prepared submit data:', JSON.stringify(submitData, null, 2));
       
       console.log('Submitting issue:', submitData); // Debug
       onSubmit(submitData);
@@ -203,16 +199,18 @@ export const IssueForm = ({ onSubmit, onCancel, initialData = null, loading = fa
         disabled={loading}
       />
 
-      <Select
-        label="Location"
-        name="locationId"
-        value={formData.locationId}
-        onChange={(e) => handleChange('locationId', e.target.value)}
-        options={locationOptions}
-        required
-        error={errors.locationId}
-        disabled={loading || loadingLocations}
-      />
+      {/* Location Selector - Rwanda Hierarchy */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Location <span className="text-red-500">*</span>
+        </label>
+        <LocationSelector
+          onLocationChange={handleLocationChange}
+          selectedVillageCode={formData.villageCode}
+          error={errors.villageCode}
+          required
+        />
+      </div>
 
       <Textarea
         label="Description"

@@ -10,6 +10,7 @@ import { Users } from './pages/Users';
 import { Locations } from './pages/Locations';
 import { Tags } from './pages/Tags';
 import { Notifications } from './pages/Notifications';
+import { Profile } from './pages/Profile';
 import { Login } from './pages/auth/Login';
 import { SignUp } from './pages/auth/SignUp';
 import { ForgotPassword } from './pages/auth/ForgotPassword';
@@ -99,7 +100,7 @@ function App() {
           <Route
             path={ROUTES.TAGS}
             element={
-              <ProtectedRoute>
+              <ProtectedRoute adminOnly>
                 <Tags />
               </ProtectedRoute>
             }
@@ -110,6 +111,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <Notifications />
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path={ROUTES.PROFILE}
+            element={
+              <ProtectedRoute>
+                <Profile />
               </ProtectedRoute>
             }
           />

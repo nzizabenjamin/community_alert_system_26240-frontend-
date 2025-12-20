@@ -122,6 +122,15 @@ const loadIssues = async () => {
       setError(null);
       
       console.log('📤 Creating issue:', issueData);
+      console.log('📤 Issue data details:', {
+        title: issueData.title,
+        category: issueData.category,
+        villageCode: issueData.villageCode,
+        villageCodeType: typeof issueData.villageCode,
+        reportedById: issueData.reportedById,
+        tagIds: issueData.tagIds,
+        tagIdsLength: issueData.tagIds?.length || 0
+      });
       
       const response = await issueService.create(issueData);
       console.log('✅ Issue created:', response.data);
@@ -133,7 +142,13 @@ const loadIssues = async () => {
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
       console.error('❌ Create error:', err);
-      console.error('Response:', err.response?.data);
+      console.error('❌ Error response:', err.response?.data);
+      console.error('❌ Error status:', err.response?.status);
+      console.error('❌ Error config:', {
+        url: err.config?.url,
+        method: err.config?.method,
+        data: err.config?.data
+      });
       
       // Handle tag validation errors specifically
       let errorMessage = err.response?.data?.message || 
@@ -144,6 +159,17 @@ const loadIssues = async () => {
       // Check for tag-related errors
       if (errorMessage.includes('tag') || errorMessage.includes('Tag')) {
         errorMessage = `Tag Error: ${errorMessage}. Please select only active tags.`;
+      }
+      
+      // Check for location-related errors
+      if (errorMessage.includes('location') || errorMessage.includes('Location') || 
+          errorMessage.includes('village') || errorMessage.includes('Village')) {
+        errorMessage = `Location Error: ${errorMessage}. Please ensure all location levels are selected.`;
+      }
+      
+      // More specific error for 500
+      if (err.response?.status === 500) {
+        errorMessage = `Server Error (500): ${errorMessage}. Please check that all required fields are valid and try again.`;
       }
       
       setError(errorMessage);

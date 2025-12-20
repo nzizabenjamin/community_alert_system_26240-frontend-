@@ -12,8 +12,10 @@ import {
 } from '../components/common';
 import { Plus, Edit, Trash2, MapPin } from 'lucide-react';
 import { locationService } from '../services/locationService';
+import { useAuth } from '../context/AuthContext';
 
 export const Locations = () => {
+  const { user } = useAuth();
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -31,31 +33,46 @@ export const Locations = () => {
 
   useEffect(() => {
     loadLocations();
-  }, []);
+  }, [user]);
 
   const loadLocations = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await locationService.getAll();
       
-      // Handle both paginated and non-paginated responses
-      if (response.data) {
-        let locationsData = [];
-        
-        if (response.data.content && Array.isArray(response.data.content)) {
-          // Backend returns: { content: [...], totalPages: 5, totalElements: 45 }
-          locationsData = response.data.content;
-        } else if (Array.isArray(response.data)) {
-          // Backend returns plain array
-          locationsData = response.data;
+      // For RESIDENTS, only show their own location
+      if (user?.role === 'RESIDENT' && user?.locationId) {
+        try {
+          const response = await locationService.getById(user.locationId);
+          setLocations([response.data]);
+          console.log('✅ Loaded resident location:', response.data);
+        } catch (err) {
+          console.error('❌ Load resident location error:', err);
+          setError(`Failed to load your location: ${err.response?.data?.message || err.message || 'Unknown error'}`);
+          setLocations([]);
         }
-        
-        setLocations(locationsData);
-        console.log('✅ Loaded locations:', locationsData.length);
       } else {
-        setLocations([]);
-        console.warn('⚠️ No data in response:', response);
+        // For ADMIN, load all locations
+        const response = await locationService.getAll();
+        
+        // Handle both paginated and non-paginated responses
+        if (response.data) {
+          let locationsData = [];
+          
+          if (response.data.content && Array.isArray(response.data.content)) {
+            // Backend returns: { content: [...], totalPages: 5, totalElements: 45 }
+            locationsData = response.data.content;
+          } else if (Array.isArray(response.data)) {
+            // Backend returns plain array
+            locationsData = response.data;
+          }
+          
+          setLocations(locationsData);
+          console.log('✅ Loaded locations:', locationsData.length);
+        } else {
+          setLocations([]);
+          console.warn('⚠️ No data in response:', response);
+        }
       }
     } catch (err) {
       console.error('❌ Load locations error:', err);
@@ -140,25 +157,29 @@ export const Locations = () => {
     {
       header: 'Actions',
       render: (row) => (
-        <div className="flex gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            icon={Edit}
-            onClick={() => handleEdit(row)}
-          >
-            Edit
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            icon={Trash2}
-            onClick={() => handleDelete(row.id)}
-            className="text-red-600 hover:bg-red-50"
-          >
-            Delete
-          </Button>
-        </div>
+        user?.role === 'ADMIN' ? (
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={Edit}
+              onClick={() => handleEdit(row)}
+            >
+              Edit
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={Trash2}
+              onClick={() => handleDelete(row.id)}
+              className="text-red-600 hover:bg-red-50"
+            >
+              Delete
+            </Button>
+          </div>
+        ) : (
+          <span className="text-sm text-gray-500">View only</span>
+        )
       )
     }
   ];
@@ -184,39 +205,49 @@ export const Locations = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Locations Management</h1>
-          <p className="text-gray-600 mt-1">Manage Rwanda's administrative locations</p>
+          <h1 className="text-3xl font-bold text-gray-900">
+            {user?.role === 'RESIDENT' ? 'My Location' : 'Locations Management'}
+          </h1>
+          <p className="text-gray-600 mt-1">
+            {user?.role === 'RESIDENT' 
+              ? 'View your location details' 
+              : 'Manage Rwanda\'s administrative locations'}
+          </p>
         </div>
-        <Button 
-          variant="primary" 
-          icon={Plus}
-          onClick={() => {
-            resetForm();
-            setEditingLocation(null);
-            setShowCreateModal(true);
-          }}
-        >
-          Add Location
-        </Button>
+        {user?.role === 'ADMIN' && (
+          <Button 
+            variant="primary" 
+            icon={Plus}
+            onClick={() => {
+              resetForm();
+              setEditingLocation(null);
+              setShowCreateModal(true);
+            }}
+          >
+            Add Location
+          </Button>
+        )}
       </div>
 
       {error && <Alert type="error" message={error} onClose={() => setError(null)} />}
       {success && <Alert type="success" message={success} onClose={() => setSuccess(null)} />}
 
-      <Card>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <SearchBar
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search locations..."
-          />
-          <Select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            options={typeOptions}
-          />
-        </div>
-      </Card>
+      {user?.role === 'ADMIN' && (
+        <Card>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <SearchBar
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search locations..."
+            />
+            <Select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              options={typeOptions}
+            />
+          </div>
+        </Card>
+      )}
 
       <Card noPadding>
         <Table

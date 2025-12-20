@@ -15,7 +15,7 @@ export const Sidebar = ({ isOpen, onClose }) => {
     { id: 'users', label: 'Users', icon: Users, path: ROUTES.USERS, adminOnly: true },
     { id: 'locations', label: 'Locations', icon: MapPin, path: ROUTES.LOCATIONS },
     { id: 'notifications', label: 'Notifications', icon: Bell, path: ROUTES.NOTIFICATIONS },
-    { id: 'tags', label: 'Tags', icon: Tag, path: ROUTES.TAGS }
+    { id: 'tags', label: 'Tags', icon: Tag, path: ROUTES.TAGS, adminOnly: true }
   ];
 
   const filteredMenuItems = menuItems.filter(
