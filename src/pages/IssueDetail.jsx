@@ -18,7 +18,6 @@ import {
   Calendar, 
   User, 
   Clock,
-  MessageSquare,
   Tag as TagIcon,
   CheckCircle
 } from 'lucide-react';
@@ -40,11 +39,9 @@ export const IssueDetail = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
-  const [showCommentModal, setShowCommentModal] = useState(false);
   
   // Form states
   const [newStatus, setNewStatus] = useState('');
-  const [comment, setComment] = useState('');
   const [editForm, setEditForm] = useState({
     title: '',
     description: '',
@@ -150,13 +147,6 @@ export const IssueDetail = () => {
       console.error('Error deleting issue:', err);
       setError('Failed to delete issue');
     }
-  };
-
-  const handleAddComment = () => {
-    setSuccess('Comment added successfully!');
-    setComment('');
-    setShowCommentModal(false);
-    setTimeout(() => setSuccess(null), 3000);
   };
 
   const getStatusBadge = (status) => {
@@ -285,43 +275,6 @@ export const IssueDetail = () => {
             </Card>
           )}
 
-          {/* Comments Section */}
-          <Card 
-            title="Comments" 
-            action={
-              <Button 
-                variant="ghost" 
-                size="sm"
-                icon={MessageSquare}
-                onClick={() => setShowCommentModal(true)}
-              >
-                Add Comment
-              </Button>
-            }
-          >
-            <div className="space-y-4">
-              {/* Demo Comments */}
-              <div className="border-l-4 border-blue-500 pl-4 py-2">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
-                    JD
-                  </div>
-                  <div>
-                    <p className="font-medium text-sm">John Doe</p>
-                    <p className="text-xs text-gray-500">2 hours ago</p>
-                  </div>
-                </div>
-                <p className="text-gray-700 text-sm">
-                  I've reported this to the maintenance team. They should be looking into it soon.
-                </p>
-              </div>
-
-              <div className="text-center text-gray-500 text-sm py-4">
-                <MessageSquare className="mx-auto mb-2 text-gray-400" size={24} />
-                <p>No more comments yet</p>
-              </div>
-            </div>
-          </Card>
         </div>
 
         {/* Sidebar */}
@@ -489,36 +442,6 @@ export const IssueDetail = () => {
             required
           />
         </div>
-      </Modal>
-
-      {/* Add Comment Modal */}
-      <Modal
-        isOpen={showCommentModal}
-        onClose={() => setShowCommentModal(false)}
-        title="Add Comment"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setShowCommentModal(false)}>
-              Cancel
-            </Button>
-            <Button 
-              variant="primary" 
-              onClick={handleAddComment}
-              disabled={!comment.trim()}
-            >
-              Add Comment
-            </Button>
-          </>
-        }
-      >
-        <Textarea
-          label="Your Comment"
-          value={comment}
-          onChange={(e) => setComment(e.target.value)}
-          placeholder="Write your comment here..."
-          rows={4}
-          required
-        />
       </Modal>
 
       {/* Delete Confirmation Modal */}

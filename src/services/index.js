@@ -4,4 +4,3 @@ export { userService } from './userService';
 export { issueService } from './issueService';
 export { locationService } from './locationService';
 export { tagService } from './tagService';
-export { commentService } from './commentService';
