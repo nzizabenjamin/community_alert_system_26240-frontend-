@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="200" height="200">
+  <defs>
+    <linearGradient id="shieldGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#4A90E2;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0056b3;stop-opacity:1" />
+    </linearGradient>
+    <color id="alertColor" value="#FF5722" />
+  </defs>
+
+  <path d="M50 5 C 20 15, 5 35, 5 60 C 5 80, 25 95, 50 100 C 75 95, 95 80, 95 60 C 95 35, 80 15, 50 5 Z" 
+        fill="url(#shieldGradient)" stroke="none" opacity="0.2" />
+  <path d="M50 10 C 25 18, 12 36, 12 58 C 12 76, 28 90, 50 95 C 72 90, 88 76, 88 58 C 88 36, 75 18, 50 10 Z" 
+        fill="none" stroke="#4A90E2" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+
+  <g transform="translate(50, 55)" fill="#FF5722">
+    <path d="M-15 0 C -15 -10, -10 -20, 0 -20 C 10 -20, 15 -10, 15 0 L 18 5 L -18 5 L -15 0 Z" />
+    <circle cx="0" cy="10" r="4" />
+    
+    <g stroke="#FF5722" stroke-width="3" fill="none" stroke-linecap="round">
+      <path d="M -22 -5 Q -28 0, -22 10" opacity="0.6" />
+      <path d="M 22 -5 Q 28 0, 22 10" opacity="0.6" />
+      <path d="M -26 -10 Q -36 0, -26 15" opacity="0.4" />
+      <path d="M 26 -10 Q 36 0, 26 15" opacity="0.4" />
+    </g>
+  </g>
+
+</svg>
