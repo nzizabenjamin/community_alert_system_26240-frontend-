@@ -10,7 +10,7 @@ import {
   Modal,
   Alert
 } from '../components/common';
-import { Plus, Filter, Download, Eye } from 'lucide-react';
+import { Plus, Eye } from 'lucide-react';
 import { issueService } from '../services/issueService';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '../utils/constants';
@@ -315,14 +315,6 @@ const loadIssues = async () => {
             onChange={(e) => setStatusFilter(e.target.value)}
             options={statusOptions}
           />
-        </div>
-        <div className="flex gap-2 mt-4">
-          <Button variant="ghost" size="sm" icon={Filter}>
-            More Filters
-          </Button>
-          <Button variant="ghost" size="sm" icon={Download}>
-            Export
-          </Button>
         </div>
       </Card>
 

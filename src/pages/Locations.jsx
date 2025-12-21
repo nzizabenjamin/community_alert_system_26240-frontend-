@@ -12,10 +12,11 @@ import {
 } from '../components/common';
 import { Plus, Edit, Trash2, MapPin } from 'lucide-react';
 import { locationService } from '../services/locationService';
+import { userService } from '../services/userService';
 import { useAuth } from '../context/AuthContext';
 
 export const Locations = () => {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -32,7 +33,12 @@ export const Locations = () => {
   });
 
   useEffect(() => {
-    loadLocations();
+    if (user) {
+      console.log('👤 User object in Locations page:', user);
+      console.log('📍 User locationId:', user.locationId);
+      console.log('📍 User location object:', user.location);
+      loadLocations();
+    }
   }, [user]);
 
   const loadLocations = async () => {
@@ -41,17 +47,120 @@ export const Locations = () => {
       setError(null);
       
       // For RESIDENTS, only show their own location
-      if (user?.role === 'RESIDENT' && user?.locationId) {
-        try {
-          const response = await locationService.getById(user.locationId);
-          setLocations([response.data]);
-          console.log('✅ Loaded resident location:', response.data);
-        } catch (err) {
-          console.error('❌ Load resident location error:', err);
-          setError(`Failed to load your location: ${err.response?.data?.message || err.message || 'Unknown error'}`);
-          setLocations([]);
+      // Also handle case where role might be null but user has locationId (treat as RESIDENT)
+      const isResident = user?.role === 'RESIDENT' || (user?.role === null && user?.locationId);
+      
+      if (isResident) {
+        // Get locationId from user object (could be user.locationId or user.location?.id)
+        let locationId = user?.locationId || user?.location?.id;
+        let currentUser = user;
+        let locationFromUser = user?.location;
+        
+        // Check if we have a full location object in the user object
+        if (locationFromUser && locationFromUser.id) {
+          console.log('✅ Found location object in user:', locationFromUser);
+          setLocations([locationFromUser]);
+          setLoading(false);
+          return; // Early return if we have location data
         }
-      } else {
+        
+        // If no locationId found, try refreshing user data from backend
+        if (!locationId) {
+          try {
+            console.log('🔄 No locationId in user object, refreshing user data from backend...');
+            if (refreshUser) {
+              currentUser = await refreshUser();
+              locationId = currentUser?.locationId || currentUser?.location?.id;
+              locationFromUser = currentUser?.location;
+              console.log('✅ Refreshed user data, locationId:', locationId);
+              
+              // Check if refreshed user has location object
+              if (locationFromUser && locationFromUser.id) {
+                console.log('✅ Found location object in refreshed user:', locationFromUser);
+                setLocations([locationFromUser]);
+                setLoading(false);
+                return; // Early return if we have location data
+              }
+            } else {
+              // Fallback: use userService directly
+              const userResponse = await userService.getCurrentUserProfile();
+              if (userResponse.data) {
+                currentUser = userResponse.data;
+                locationId = currentUser?.locationId || currentUser?.location?.id;
+                locationFromUser = currentUser?.location;
+                localStorage.setItem('user', JSON.stringify(currentUser));
+                console.log('✅ Refreshed user data via service, locationId:', locationId);
+                
+                // Check if refreshed user has location object
+                if (locationFromUser && locationFromUser.id) {
+                  console.log('✅ Found location object in refreshed user:', locationFromUser);
+                  setLocations([locationFromUser]);
+                  setLoading(false);
+                  return; // Early return if we have location data
+                }
+              }
+            }
+          } catch (refreshErr) {
+            console.warn('⚠️ Failed to refresh user data:', refreshErr);
+            // Continue with error handling below
+          }
+        }
+        
+        if (locationId) {
+          try {
+            console.log('🔍 Fetching location with ID:', locationId);
+            const response = await locationService.getById(locationId);
+            console.log('📦 Raw API response:', response);
+            console.log('📦 Response data:', response.data);
+            
+            // Handle different response structures
+            let locationData = null;
+            if (response.data) {
+              // Check if response.data is the location object directly
+              if (response.data.id || response.data.name) {
+                locationData = response.data;
+              } 
+              // Check if response.data has a nested location
+              else if (response.data.location) {
+                locationData = response.data.location;
+              }
+              // Check if response.data is an array with one item
+              else if (Array.isArray(response.data) && response.data.length > 0) {
+                locationData = response.data[0];
+              }
+            }
+            
+            if (locationData) {
+              setLocations([locationData]);
+              console.log('✅ Loaded resident location:', locationData);
+              setError(null); // Clear any previous errors
+            } else {
+              console.error('❌ Location data is null or invalid:', response);
+              setError('Location data received but format is invalid. Please contact support.');
+              setLocations([]);
+            }
+          } catch (err) {
+            console.error('❌ Load resident location error:', err);
+            console.error('Error details:', {
+              status: err.response?.status,
+              statusText: err.response?.statusText,
+              data: err.response?.data,
+              message: err.message
+            });
+            console.error('Location ID used:', locationId);
+            console.error('User object:', currentUser);
+            
+            const errorMessage = err.response?.data?.message || err.message || 'Unknown error';
+            setError(`Failed to load your location: ${errorMessage}`);
+            setLocations([]);
+          }
+        } else {
+          // RESIDENT user doesn't have a locationId after refresh
+          setError('Your location information is not available. Please log out and log back in, or contact support if the issue persists.');
+          setLocations([]);
+          console.warn('⚠️ RESIDENT user has no locationId after refresh:', currentUser);
+        }
+      } else if (user?.role === 'ADMIN') {
         // For ADMIN, load all locations
         const response = await locationService.getAll();
         
@@ -73,6 +182,9 @@ export const Locations = () => {
           setLocations([]);
           console.warn('⚠️ No data in response:', response);
         }
+      } else {
+        // Unknown role or no user
+        setLocations([]);
       }
     } catch (err) {
       console.error('❌ Load locations error:', err);
@@ -157,7 +269,7 @@ export const Locations = () => {
     {
       header: 'Actions',
       render: (row) => (
-        user?.role === 'ADMIN' ? (
+        user?.role === 'ADMIN' && !(user?.role === null && user?.locationId) ? (
           <div className="flex gap-2">
             <Button
               variant="ghost"
@@ -206,10 +318,10 @@ export const Locations = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">
-            {user?.role === 'RESIDENT' ? 'My Location' : 'Locations Management'}
+            {(user?.role === 'RESIDENT' || (user?.role === null && user?.locationId)) ? 'My Location' : 'Locations Management'}
           </h1>
           <p className="text-gray-600 mt-1">
-            {user?.role === 'RESIDENT' 
+            {(user?.role === 'RESIDENT' || (user?.role === null && user?.locationId))
               ? 'View your location details' 
               : 'Manage Rwanda\'s administrative locations'}
           </p>
@@ -249,7 +361,22 @@ export const Locations = () => {
         </Card>
       )}
 
+      {user?.role === null && user?.locationId && (
+        <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <p className="text-sm text-yellow-800">
+            <strong>Note:</strong> Your user role is not set. Please contact support to update your account role.
+          </p>
+        </div>
+      )}
+
       <Card noPadding>
+        {user?.role === 'RESIDENT' && locations.length === 0 && !loading && !error && (
+          <div className="p-4 bg-blue-50 border-b border-blue-200">
+            <p className="text-sm text-blue-800">
+              <strong>Debug Info:</strong> Check browser console for detailed logs about location loading.
+            </p>
+          </div>
+        )}
         <Table
           columns={locationColumns}
           data={filteredLocations}

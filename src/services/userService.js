@@ -23,5 +23,10 @@ export const userService = {
 
   getUsersByProvince: (provinceName) => {
     return api.get(`/users/byProvince/${provinceName}`);
+  },
+
+  // Get current user's profile (refreshes user data from backend)
+  getCurrentUserProfile: () => {
+    return api.get('/users/me');
   }
 };

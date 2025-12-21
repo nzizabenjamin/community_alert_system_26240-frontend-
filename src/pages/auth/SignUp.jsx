@@ -3,8 +3,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import { authService } from '../../services/authService';
 import { useAuth } from '../../context/AuthContext';
 import { ROUTES } from '../../utils/constants';
-import { Mail, Lock, User, Phone, MapPin } from 'lucide-react';
-import { locationService } from '../../services/locationService';
+import { Mail, Lock, User, Phone } from 'lucide-react';
+import { LocationSelector } from '../../components/features/LocationSelector';
 
 export const SignUp = () => {
   const { login, isAuthenticated } = useAuth();
@@ -15,9 +15,8 @@ export const SignUp = () => {
     password: '',
     confirmPassword: '',
     phoneNumber: '',
-    locationId: ''
+    villageCode: null
   });
-  const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -26,15 +25,16 @@ export const SignUp = () => {
     if (isAuthenticated) {
       navigate(ROUTES.DASHBOARD);
     }
-    loadLocations();
   }, [isAuthenticated, navigate]);
 
-  const loadLocations = async () => {
-    try {
-      const response = await locationService.getAll();
-      setLocations(Array.isArray(response.data) ? response.data : []);
-    } catch (err) {
-      console.error('Failed to load locations:', err);
+  const handleLocationChange = (locationData) => {
+    setFormData(prev => ({
+      ...prev,
+      villageCode: locationData.villageCode
+    }));
+    // Clear location error when location is selected
+    if (error && error.includes('location')) {
+      setError('');
     }
   };
 
@@ -52,10 +52,21 @@ export const SignUp = () => {
       return;
     }
 
+    if (!formData.villageCode) {
+      setError('Please select a location. All location levels (Province, District, Sector, Cell, Village) are required.');
+      return;
+    }
+
     setLoading(true);
     
     try {
-      const { confirmPassword, ...signupData } = formData;
+      // Prepare signup data with villageCode (exclude confirmPassword)
+      const { confirmPassword, ...signupData } = {
+        ...formData,
+        villageCode: Number(formData.villageCode) // Ensure it's a number
+      };
+      
+      console.log('📋 Submitting signup with villageCode:', signupData);
       await authService.signup(signupData);
       setSuccess(true);
       setTimeout(() => {
@@ -155,24 +166,17 @@ export const SignUp = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Location
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Location <span className="text-red-500">*</span>
             </label>
-            <div className="relative">
-              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-              <select
-                value={formData.locationId}
-                onChange={(e) => setFormData({ ...formData, locationId: e.target.value })}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="">Select Location</option>
-                {locations.map(loc => (
-                  <option key={loc.id} value={loc.id}>
-                    {loc.name} ({loc.type})
-                  </option>
-                ))}
-              </select>
-            </div>
+            <LocationSelector
+              onLocationChange={handleLocationChange}
+              selectedVillageCode={formData.villageCode}
+              required
+            />
+            {error && error.includes('location') && (
+              <p className="text-sm text-red-600 mt-1">{error}</p>
+            )}
           </div>
 
           <div>

@@ -18,6 +18,23 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
+  // Function to refresh user data from backend
+  const refreshUser = async () => {
+    try {
+      const { userService } = await import('../services/userService');
+      const response = await userService.getCurrentUserProfile();
+      if (response.data) {
+        const updatedUser = response.data;
+        setUser(updatedUser);
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        return updatedUser;
+      }
+    } catch (error) {
+      console.error('Error refreshing user:', error);
+      throw error;
+    }
+  };
+
   const login = async (email, password) => {
     try {
       const response = await authService.login(email, password);
@@ -37,7 +54,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated, loading, login, logout, setUser, setIsAuthenticated }}>
+    <AuthContext.Provider value={{ user, isAuthenticated, loading, login, logout, setUser, setIsAuthenticated, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );
